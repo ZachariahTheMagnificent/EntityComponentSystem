@@ -167,6 +167,14 @@ private:
 template<typename Implementation, typename...Components>
 using Entity = Entity_<Implementor<Implementation, Components...>, Components...>;
 
+template<typename FirstComponent, typename...OtherComponents>
+struct ComponentSet
+{
+	using GetBaseEntity = BaseEntity<FirstComponent, OtherComponents...>;
+	template<class Implementation>
+	using GetEntity = Entity<Implementation, FirstComponent, OtherComponents...>;
+};
+
 class Flyable
 {
 public:
