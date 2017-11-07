@@ -5,62 +5,37 @@
 template<typename Base, typename Component>
 class ComponentList : public Base
 {
-protected:
-	template<typename Component, typename TestEntity>
-	struct GetElement_;
-
-	template<typename Component, typename Base, typename OtherComponent>
-	struct GetElement_<Component, ComponentList<Base, OtherComponent>>
-	{
-		using Type = typename GetElement_<Component, Base>::Type;
-	};
-
-	template<typename Component, typename Base>
-	struct GetElement_<Component, ComponentList<Base, Component>>
-	{
-		using Type = ComponentList<Base, Component>;
-	};
-
-	template<typename Component>
-	struct GetElement_<Component, ComponentList<void, Component>>
-	{
-		using Type = ComponentList<void, Component>;
-	};
-
-	template<typename NextComponent>
-	using Add = ComponentList<ComponentList, NextComponent>;
-
-	template<class Component>
-	using GetElement = typename GetElement_<Component, ComponentList>::Type;
-
 public:
 	ComponentList ( ) = default;
 	virtual ~ComponentList ( ) = default;
 
-	virtual Component* Get ( const Component*const ) = 0;
+protected:
+	template<typename NextComponent>
+	using Add = ComponentList<ComponentList, NextComponent>;
+
+	virtual Component* Get ( const Component*const dummy_pointer ) = 0;
+	virtual const Component* Get ( const Component*const dummy_pointer ) const = 0;
 };
 
 template<typename Component>
 class ComponentList<void, Component>
 {
-protected:
-	template<typename NextComponent>
-	using Add = ComponentList<ComponentList, NextComponent>;
-
-	template<class Component>
-	using GetElement = ComponentList;
-
 public:
 	ComponentList ( ) = default;
 	virtual ~ComponentList ( ) = default;
 
-	virtual Component* Get ( const Component*const ) = 0;
+protected:
+	template<typename NextComponent>
+	using Add = ComponentList<ComponentList, NextComponent>;
+
+	virtual Component* Get ( const Component*const dummy_pointer ) = 0;
+	virtual const Component* Get ( const Component*const dummy_pointer ) const = 0;
 };
 
-template<class List, class...Components>
+template<typename List, typename...Components>
 class BaseEntity_;
 
-template<class Base, class CurrentComponent, class Component, class...OtherComponents>
+template<typename Base, typename CurrentComponent, typename Component, typename...OtherComponents>
 class BaseEntity_<ComponentList<Base, CurrentComponent>, Component, OtherComponents...> : public BaseEntity_<typename ComponentList<Base, CurrentComponent>::Add<Component>, OtherComponents...>
 {
 public:
@@ -68,45 +43,57 @@ public:
 	virtual ~BaseEntity_ ( ) = default;
 };
 
-template<class List>
-class BaseEntity_<List> : private List
+template<typename List>
+class BaseEntity_<List> : public List
 {
 public:
 	BaseEntity_ ( ) = default;
 	virtual ~BaseEntity_ ( ) = default;
 
-	template<class Component>
+	template<typename Component>
 	Component* GetComponent ( )
 	{
-		using Element = typename List::GetElement<Component>;
-
-		const Component*const ptr = nullptr;
-		return static_cast<Element*>( this )->Get ( ptr );
+		const Component*const component = nullptr;
+		return Get ( component );
+	}
+	template<typename Component>
+	const Component* GetComponent ( ) const
+	{
+		const Component*const component = nullptr;
+		return Get ( component );
 	}
 };
 
-template<class FirstComponent, class...OtherComponents>
+template<typename FirstComponent, typename...OtherComponents>
 using BaseEntity = BaseEntity_<ComponentList<void, FirstComponent>, OtherComponents...>;
 
-template<class Base, class Component>
+template<typename Base, typename Component>
 class Dispatcher : public Base
 {
 public:
-	template<class Component>
+	Dispatcher ( ) = default;
+	virtual ~Dispatcher ( ) = default;
+
+protected:
+	template<typename Component>
 	using Add = Dispatcher<Dispatcher, Component>;
 
-	template<class Implementation, bool Convertible = std::is_convertible<Implementation, Component&>::value>
+	template<typename Implementation, bool Convertible = std::is_convertible<Implementation, Component&>::value>
 	struct Dispatch
 	{
-		static Component* Do ( Implementation& implementation )
+		static Component* Execute ( Implementation& implementation )
 		{
 			return &static_cast< Component& >( implementation );
 		}
+		static const Component* Execute ( const Implementation& implementation )
+		{
+			return &static_cast< const Component& >( implementation );
+		}
 	};
-	template<class Implementation>
+	template<typename Implementation>
 	struct Dispatch<Implementation, false>
 	{
-		static Component* Do ( Implementation& )
+		static Component* Execute ( const Implementation& )
 		{
 			return nullptr;
 		}
@@ -115,40 +102,60 @@ public:
 	Component* Get ( const Component*const ) override
 	{
 		auto& implementation = GetImplementation ( );
+		using ImplementationType = std::decay_t<decltype ( implementation )>;
+
+		return Dispatch<ImplementationType>::Execute ( implementation );
+	}
+	const Component* Get ( const Component*const ) const override
+	{
+		const auto& implementation = GetImplementation ( );
 		using ImplementationType = decltype ( implementation );
 
-		return Dispatch<ImplementationType>::Do ( implementation );
+		return Dispatch<ImplementationType>::Execute ( implementation );
 	}
 };
 
-template<class Base, class...Components>
+template<typename Base, typename...Components>
 class Entity_;
 
-template<class Base, class FirstComponent, class...OtherComponents>
+template<typename Base, typename FirstComponent, typename...OtherComponents>
 class Entity_<Base, FirstComponent, OtherComponents...> : public Entity_<Dispatcher<Base, FirstComponent>, OtherComponents...>
 {
-
+public:
+	Entity_ ( ) = default;
+	virtual ~Entity_ ( ) = default;
 };
 
-template<class Base, typename CurrentComponent, class Component, class...OtherComponents>
+template<typename Base, typename CurrentComponent, typename Component, typename...OtherComponents>
 class Entity_<Dispatcher<Base, CurrentComponent>, Component, OtherComponents...> : public Entity_<Dispatcher<Base, CurrentComponent>::Add<Component>, OtherComponents...>
 {
-
+public:
+	Entity_ ( ) = default;
+	virtual ~Entity_ ( ) = default;
 };
 
-template<class Base>
+template<typename Base>
 class Entity_<Base> : public Base
 {
-
+public:
+	Entity_ ( ) = default;
+	virtual ~Entity_ ( ) = default;
 };
 
-template<class Implementation, class FirstComponent, class...OtherComponents>
+template<typename Implementation, typename FirstComponent, typename...OtherComponents>
 class Implementor : public BaseEntity<FirstComponent, OtherComponents...>
 {
 public:
 	using Base = BaseEntity<FirstComponent, OtherComponents...>;
 
+	Implementor ( ) = default;
+	virtual ~Implementor ( ) = default;
+
 	Implementation& GetImplementation ( )
+	{
+		return implementation_;
+	}
+	const Implementation& GetImplementation ( ) const
 	{
 		return implementation_;
 	}
