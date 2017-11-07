@@ -108,8 +108,8 @@ protected:
 	}
 	const Component* Get ( const Component*const ) const override
 	{
-		const auto& implementation = GetImplementation ( );
-		using ImplementationType = decltype ( implementation );
+		auto& implementation = GetImplementation ( );
+		using ImplementationType = std::decay_t<decltype ( implementation )>;
 
 		return Dispatch<ImplementationType>::Execute ( implementation );
 	}
@@ -202,7 +202,7 @@ public:
 
 	}
 
-	void Render ( )
+	void Render ( ) const
 	{
 		std::cout << "Rendered " << name_ << '\n';
 	}
@@ -254,6 +254,10 @@ public:
 	{
 		return renderable_;
 	}
+	operator const Renderable& ( ) const
+	{
+		return renderable_;
+	}
 
 private:
 	Renderable renderable_;
@@ -261,10 +265,21 @@ private:
 
 int main ( )
 {
-	Entity<Box, Flyable, Clickable, Renderable> entity;
-	entity.GetImplementation ( ) = Box { "lel" };
+	using ComponentSet = ComponentSet<Flyable, Clickable, Renderable>;
 
-	Renderable* renderable = entity.GetComponent<Renderable> ( );
+	using BaseEntity = ComponentSet::GetBaseEntity;
+
+	using ButtonEntity = ComponentSet::GetEntity<Button>;
+	using BirdEntity = ComponentSet::GetEntity<Bird>;
+	using BoxEntity = ComponentSet::GetEntity<Box>;
+
+	const BoxEntity entity;
+
+	//entity.GetImplementation ( ) = Box { "lel" };
+
+	const Renderable* renderable = entity.GetComponent<Renderable> ( );
+
+	constexpr bool test = std::is_convertible<const Box&, Renderable&> ( );
 
 	if ( renderable != nullptr )
 	{
