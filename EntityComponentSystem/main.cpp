@@ -92,44 +92,8 @@ private:
 	Renderable renderable_;
 };
 
-class Base
-{
-public:
-	template<typename...Types>
-	Base ( Types&&...arguments ) : x { std::forward<Types>(arguments)... }
-	{
-
-	}
-
-public:
-	int x;
-};
-
-class Derived : public Base
-{
-public:
-	using Base::Base;
-};
-
-class NextDerived : public Derived
-{
-public:
-	using Derived::Derived;
-};
-
-class NextNextDerived : public NextDerived
-{
-public:
-	using NextDerived::NextDerived;
-};
-
 int main ( )
 {
-	Derived d { 1 };
-	NextDerived e { 1 };
-	NextNextDerived f { 1 };
-
-
 	using ComponentSet = ComponentSet<Flyable, Clickable, Renderable>;
 
 	using BaseEntity = ComponentSet::GetBaseEntity;
@@ -138,13 +102,37 @@ int main ( )
 	using BirdEntity = ComponentSet::GetEntity<Bird>;
 	using BoxEntity = ComponentSet::GetEntity<Box>;
 
-	BoxEntity B { "button" };
-	Flyable* r=B.GetComponent<Flyable> ( );
-	
-	//if ( r != nullptr )
-	//{
-	//	r->Render ( );
-	//}
+	auto HandleEntity = [ ] ( BaseEntity& entity )
+	{
+		const auto clickable = entity.GetComponent<Clickable> ( );
+		const auto flyable = entity.GetComponent<Flyable> ( );
+		const auto renderable = entity.GetComponent<Renderable> ( );
+
+		if ( clickable )
+		{
+			clickable->OnClick ( );
+		}
+		if ( flyable )
+		{
+			flyable->Fly ( );
+		}
+		if ( renderable )
+		{
+			renderable->Render ( );
+		}
+	};
+
+	std::vector<std::unique_ptr<BaseEntity>> entities_;
+	entities_.reserve ( 3 );
+	entities_.push_back ( std::make_unique<ButtonEntity> ( "butt" ) );
+	entities_.push_back ( std::make_unique<BirdEntity> ( "birb" ) );
+	entities_.push_back ( std::make_unique<BoxEntity> ( "snake" ) );
+
+	for ( const auto& entity : entities_ )
+	{
+		HandleEntity ( *entity );
+	}
+
 	system ( "pause" );
 	return 0;
 }

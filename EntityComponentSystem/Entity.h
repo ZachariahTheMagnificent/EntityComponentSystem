@@ -13,7 +13,6 @@ protected:
 	using Add = ComponentList<ComponentList, NextComponent>;
 
 	using Base::Get;
-
 	virtual Component* Get ( const Component*const dummy_pointer ) = 0;
 	virtual const Component* Get ( const Component*const dummy_pointer ) const = 0;
 };
@@ -79,7 +78,7 @@ protected:
 	template<typename Component>
 	using Add = Dispatcher<Dispatcher, Component>;
 
-	template<typename Implementation, bool Convertible = std::is_convertible<Implementation, Component&>::value>
+	template<typename Implementation, bool Convertible = std::is_convertible<Implementation&, Component&>::value>
 	struct Dispatch
 	{
 		static Component* Execute ( Implementation& implementation )
