@@ -1,179 +1,8 @@
 #include <iostream>
-#include <type_traits>
 #include <string>
-
-template<typename Base, typename Component>
-class ComponentList : public Base
-{
-public:
-	ComponentList ( ) = default;
-	virtual ~ComponentList ( ) = default;
-
-protected:
-	template<typename NextComponent>
-	using Add = ComponentList<ComponentList, NextComponent>;
-
-	virtual Component* Get ( const Component*const dummy_pointer ) = 0;
-	virtual const Component* Get ( const Component*const dummy_pointer ) const = 0;
-};
-
-template<typename Component>
-class ComponentList<void, Component>
-{
-public:
-	ComponentList ( ) = default;
-	virtual ~ComponentList ( ) = default;
-
-protected:
-	template<typename NextComponent>
-	using Add = ComponentList<ComponentList, NextComponent>;
-
-	virtual Component* Get ( const Component*const dummy_pointer ) = 0;
-	virtual const Component* Get ( const Component*const dummy_pointer ) const = 0;
-};
-
-template<typename List, typename...Components>
-class BaseEntity_;
-
-template<typename Base, typename CurrentComponent, typename Component, typename...OtherComponents>
-class BaseEntity_<ComponentList<Base, CurrentComponent>, Component, OtherComponents...> : public BaseEntity_<typename ComponentList<Base, CurrentComponent>::Add<Component>, OtherComponents...>
-{
-public:
-	BaseEntity_ ( ) = default;
-	virtual ~BaseEntity_ ( ) = default;
-};
-
-template<typename List>
-class BaseEntity_<List> : public List
-{
-public:
-	BaseEntity_ ( ) = default;
-	virtual ~BaseEntity_ ( ) = default;
-
-	template<typename Component>
-	Component* GetComponent ( )
-	{
-		const Component*const component = nullptr;
-		return Get ( component );
-	}
-	template<typename Component>
-	const Component* GetComponent ( ) const
-	{
-		const Component*const component = nullptr;
-		return Get ( component );
-	}
-};
-
-template<typename FirstComponent, typename...OtherComponents>
-using BaseEntity = BaseEntity_<ComponentList<void, FirstComponent>, OtherComponents...>;
-
-template<typename Base, typename Component>
-class Dispatcher : public Base
-{
-public:
-	Dispatcher ( ) = default;
-	virtual ~Dispatcher ( ) = default;
-
-protected:
-	template<typename Component>
-	using Add = Dispatcher<Dispatcher, Component>;
-
-	template<typename Implementation, bool Convertible = std::is_convertible<Implementation, Component&>::value>
-	struct Dispatch
-	{
-		static Component* Execute ( Implementation& implementation )
-		{
-			return &static_cast< Component& >( implementation );
-		}
-		static const Component* Execute ( const Implementation& implementation )
-		{
-			return &static_cast< const Component& >( implementation );
-		}
-	};
-	template<typename Implementation>
-	struct Dispatch<Implementation, false>
-	{
-		static Component* Execute ( const Implementation& )
-		{
-			return nullptr;
-		}
-	};
-
-	Component* Get ( const Component*const ) override
-	{
-		auto& implementation = GetImplementation ( );
-		using ImplementationType = std::decay_t<decltype ( implementation )>;
-
-		return Dispatch<ImplementationType>::Execute ( implementation );
-	}
-	const Component* Get ( const Component*const ) const override
-	{
-		auto& implementation = GetImplementation ( );
-		using ImplementationType = std::decay_t<decltype ( implementation )>;
-
-		return Dispatch<ImplementationType>::Execute ( implementation );
-	}
-};
-
-template<typename Base, typename...Components>
-class Entity_;
-
-template<typename Base, typename FirstComponent, typename...OtherComponents>
-class Entity_<Base, FirstComponent, OtherComponents...> : public Entity_<Dispatcher<Base, FirstComponent>, OtherComponents...>
-{
-public:
-	Entity_ ( ) = default;
-	virtual ~Entity_ ( ) = default;
-};
-
-template<typename Base, typename CurrentComponent, typename Component, typename...OtherComponents>
-class Entity_<Dispatcher<Base, CurrentComponent>, Component, OtherComponents...> : public Entity_<Dispatcher<Base, CurrentComponent>::Add<Component>, OtherComponents...>
-{
-public:
-	Entity_ ( ) = default;
-	virtual ~Entity_ ( ) = default;
-};
-
-template<typename Base>
-class Entity_<Base> : public Base
-{
-public:
-	Entity_ ( ) = default;
-	virtual ~Entity_ ( ) = default;
-};
-
-template<typename Implementation, typename FirstComponent, typename...OtherComponents>
-class Implementor : public BaseEntity<FirstComponent, OtherComponents...>
-{
-public:
-	using Base = BaseEntity<FirstComponent, OtherComponents...>;
-
-	Implementor ( ) = default;
-	virtual ~Implementor ( ) = default;
-
-	Implementation& GetImplementation ( )
-	{
-		return implementation_;
-	}
-	const Implementation& GetImplementation ( ) const
-	{
-		return implementation_;
-	}
-
-private:
-	Implementation implementation_;
-};
-
-template<typename Implementation, typename...Components>
-using Entity = Entity_<Implementor<Implementation, Components...>, Components...>;
-
-template<typename FirstComponent, typename...OtherComponents>
-struct ComponentSet
-{
-	using GetBaseEntity = BaseEntity<FirstComponent, OtherComponents...>;
-	template<class Implementation>
-	using GetEntity = Entity<Implementation, FirstComponent, OtherComponents...>;
-};
+#include "Entity.h"
+#include <vector>
+#include <memory>
 
 class Flyable
 {
@@ -263,8 +92,44 @@ private:
 	Renderable renderable_;
 };
 
+class Base
+{
+public:
+	template<typename...Types>
+	Base ( Types&&...arguments ) : x { std::forward<Types>(arguments)... }
+	{
+
+	}
+
+public:
+	int x;
+};
+
+class Derived : public Base
+{
+public:
+	using Base::Base;
+};
+
+class NextDerived : public Derived
+{
+public:
+	using Derived::Derived;
+};
+
+class NextNextDerived : public NextDerived
+{
+public:
+	using NextDerived::NextDerived;
+};
+
 int main ( )
 {
+	Derived d { 1 };
+	NextDerived e { 1 };
+	NextNextDerived f { 1 };
+
+
 	using ComponentSet = ComponentSet<Flyable, Clickable, Renderable>;
 
 	using BaseEntity = ComponentSet::GetBaseEntity;
@@ -273,19 +138,13 @@ int main ( )
 	using BirdEntity = ComponentSet::GetEntity<Bird>;
 	using BoxEntity = ComponentSet::GetEntity<Box>;
 
-	const BoxEntity entity;
-
-	//entity.GetImplementation ( ) = Box { "lel" };
-
-	const Renderable* renderable = entity.GetComponent<Renderable> ( );
-
-	constexpr bool test = std::is_convertible<const Box&, Renderable&> ( );
-
-	if ( renderable != nullptr )
-	{
-		renderable->Render ( );
-	}
-
+	BoxEntity B { "button" };
+	Flyable* r=B.GetComponent<Flyable> ( );
+	
+	//if ( r != nullptr )
+	//{
+	//	r->Render ( );
+	//}
 	system ( "pause" );
 	return 0;
 }
